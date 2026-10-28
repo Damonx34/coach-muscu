@@ -306,6 +306,7 @@ function defaultState(){
     profile:{name:"",sex:"h",age:"",height:187,startWeight:95,goalWeight:"",activity:1.375,steps:8000,water:10,sleep:7.5,cardio:20,deficit:500},
     days:[1,2,4,5],
     rotationStart:"2026-11-02",
+    overrides:{"2026-10-27":"P","2026-10-28":"B","2026-10-30":"J"},
     sessions:JSON.parse(JSON.stringify(DEFAULT_SESSIONS)),
     workouts:[],
     active:null,
@@ -335,6 +336,8 @@ function sanitize(raw){
   ORDER.forEach(k=>{ const base=DEFAULT_SESSIONS[k]; const cur=(raw.sessions&&raw.sessions[k])||{};
     s.sessions[k]={title:typeof cur.title==="string"&&cur.title.trim()?cur.title.slice(0,30):base.title, color:base.color, fg:base.fg,
       ex:Array.isArray(cur.ex)?cur.ex.filter(e=>e&&e.id&&e.n):JSON.parse(JSON.stringify(base.ex))}; });
+  if(!s.overrides||typeof s.overrides!=="object") s.overrides={"2026-10-27":"P","2026-10-28":"B","2026-10-30":"J"};
+  Object.keys(s.overrides).forEach(k=>{ if(!/^\d{4}-\d\d-\d\d$/.test(k)||!(s.overrides[k]===null||ORDER.includes(s.overrides[k]))) delete s.overrides[k]; });
   if(!Array.isArray(s.workouts)) s.workouts=[];
   if(!s.log||typeof s.log!=="object") s.log={};
   if(!Array.isArray(s.foods)) s.foods=JSON.parse(JSON.stringify(DEFAULT_FOODS));
@@ -354,6 +357,7 @@ function dayLog(k){ return S.log[k]||{}; }
 function ensureDay(k){ if(!S.log[k]) S.log[k]={}; return S.log[k]; }
 function sessionFor(k){
   const d=parse(k);
+  if(S.overrides&&Object.prototype.hasOwnProperty.call(S.overrides,k)) return S.overrides[k];
   if(k<S.rotationStart||!S.days.includes(d.getDay())) return null;
   let n=0;
   for(let x=S.rotationStart; x<k; x=addDays(x,1)) if(S.days.includes(parse(x).getDay())) n++;
