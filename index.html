@@ -300,13 +300,15 @@ const DEFAULT_FOODS = [
   {name:"Banane",kcal:105,prot:1},
   {name:"Shaker whey (eau)",kcal:120,prot:24}
 ];
+const DEFAULT_OV={"2026-10-27":"P","2026-10-28":"B","2026-10-30":"J","2026-10-31":"P"};
 function defaultState(){
   return {
     v:1,
     profile:{name:"",sex:"h",age:"",height:187,startWeight:95,goalWeight:"",activity:1.375,steps:8000,water:10,sleep:7.5,cardio:20,deficit:500},
     days:[1,2,4,5],
     rotationStart:"2026-11-02",
-    overrides:{"2026-10-27":"P","2026-10-28":"B","2026-10-30":"J"},
+    overrides:Object.assign({},DEFAULT_OV),
+    rotationOffset:1,
     sessions:JSON.parse(JSON.stringify(DEFAULT_SESSIONS)),
     workouts:[],
     active:null,
@@ -336,7 +338,8 @@ function sanitize(raw){
   ORDER.forEach(k=>{ const base=DEFAULT_SESSIONS[k]; const cur=(raw.sessions&&raw.sessions[k])||{};
     s.sessions[k]={title:typeof cur.title==="string"&&cur.title.trim()?cur.title.slice(0,30):base.title, color:base.color, fg:base.fg,
       ex:Array.isArray(cur.ex)?cur.ex.filter(e=>e&&e.id&&e.n):JSON.parse(JSON.stringify(base.ex))}; });
-  if(!s.overrides||typeof s.overrides!=="object") s.overrides={"2026-10-27":"P","2026-10-28":"B","2026-10-30":"J"};
+  s.overrides=Object.assign({},DEFAULT_OV,(raw.overrides&&typeof raw.overrides==="object")?raw.overrides:{});
+  s.rotationOffset=Number.isInteger(raw.rotationOffset)?((raw.rotationOffset%3)+3)%3:1;
   Object.keys(s.overrides).forEach(k=>{ if(!/^\d{4}-\d\d-\d\d$/.test(k)||!(s.overrides[k]===null||ORDER.includes(s.overrides[k]))) delete s.overrides[k]; });
   if(!Array.isArray(s.workouts)) s.workouts=[];
   if(!s.log||typeof s.log!=="object") s.log={};
@@ -361,7 +364,7 @@ function sessionFor(k){
   if(k<S.rotationStart||!S.days.includes(d.getDay())) return null;
   let n=0;
   for(let x=S.rotationStart; x<k; x=addDays(x,1)) if(S.days.includes(parse(x).getDay())) n++;
-  return ORDER[n%3];
+  return ORDER[(n+(S.rotationOffset||0))%3];
 }
 function nextSession(k){ for(let i=0;i<14;i++){ const x=addDays(k,i); const s=sessionFor(x); if(s) return {k:x,s}; } return null; }
 function workoutsOn(k){ return S.workouts.filter(w=>w.date===k); }
@@ -842,7 +845,7 @@ function renderReglages(){
     <h2>Tes jours de salle</h2>
     <div class="days">${[1,2,3,4,5,6,0].map(d=>`<label><input type="checkbox" value="${d}" ${S.days.includes(d)?"checked":""}>${DAYS[d].slice(0,3)}</label>`).join("")}</div>
     <label class="field">Début de la rotation<input id="pRot" type="date" value="${esc(S.rotationStart)}"></label>
-    <p class="note" style="margin:0">Les séances tournent dans l'ordre : ${ORDER.map(k=>esc(S.sessions[k].title)).join(" → ")}, puis on recommence. La première séance de la rotation est ${esc(S.sessions.P.title)}.</p>
+    <p class="note" style="margin:0">Les séances tournent dans l'ordre : ${ORDER.map(k=>esc(S.sessions[k].title)).join(" → ")}, puis on recommence. Si tu changes la date de début, la rotation repart de ${esc(S.sessions.P.title)}.</p>
   </div>
 
   <button class="btn big" id="saveProfile">Enregistrer</button>
@@ -883,7 +886,7 @@ function renderReglages(){
     p.steps=Math.round(n("pSteps",1000,30000,8000)); p.water=Math.round(n("pWater",1,20,10)); p.sleep=n("pSleep",5,11,7.5); p.cardio=Math.round(n("pCardio",0,90,20));
     const days=$$('.days input:checked',el).map(i=>+i.value).sort((a,b)=>(a+6)%7-(b+6)%7);
     if(!days.length){ toast("Coche au moins un jour de salle."); return; }
-    S.days=days; if(/^\d{4}-\d\d-\d\d$/.test(v("pRot"))) S.rotationStart=v("pRot");
+    S.days=days; if(/^\d{4}-\d\d-\d\d$/.test(v("pRot"))&&v("pRot")!==S.rotationStart){ S.rotationStart=v("pRot"); S.rotationOffset=0; }
     save(); render(); toast("Profil enregistré.");
   };
   // Programme
